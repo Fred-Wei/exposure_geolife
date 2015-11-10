@@ -14,8 +14,7 @@ import datetime
 class gps_dump():
 
     def __init__(self):
-
-        self.dir = r'D:/1_trajectory_data/geolife/Data/*'
+        self.dir = r'E:/Data/Geolife/geolife/Data/*'
         self.host = 'localhost'
         self.database ='geolife'
         self.user = 'postgres'
@@ -98,7 +97,7 @@ class gps_dump():
         files_list = glob.glob(self.dir)
         for f in files_list:
             file_uid = re.search(self.match_pattern,f).group(0)
-            dir_plt = r'D:/1_trajectory_data/geolife/Data/'+file_uid+r'/Trajectory/200811*'
+            dir_plt = r'E:/Data/Geolife/geolife/Data/'+file_uid+r'/Trajectory/200811*'
             plt_list = glob.glob(dir_plt)
             for f_plt in plt_list:
                 print ("---->the current processed file is: "+f_plt)
@@ -188,22 +187,7 @@ class gps_dump():
             print "----->something wrong happened during querying the number of users"
             print err.message
 
-    def find_home(self):
-        self.num_uid()
-        for i in range(0,self.num_users,1):
-            try:
-                self.cur.execute("SELECT * FROM geolife.gps_points WHERE uid= {0} "
-                                 "and hour_day>'02:00:00' and hour_day<'04:00:00' "
-                                 "and day_week>=0 and day_week<=4".format(self.list_uid[i]))
-                rows = self.cur.fetchall()
-
-
-            except Exception as err:
-                print "------>something wrong happened during inferring home cluster"
-                print err.message
-
     def time_interval(self):
-
         if self.list_uid.__len__() == 0:
             self.num_uid()
         try:
@@ -233,15 +217,13 @@ class gps_dump():
 
 
 if __name__ == "__main__":
-
     gps_obj = gps_dump()
     gps_obj.conn()
     gps_obj.create_table()
-    #gps_obj.read_file()
-    #gps_obj.day_week()
-    #gps_obj.hour_day()
+    gps_obj.read_file()
+    gps_obj.day_week()
+    gps_obj.hour_day()
     gps_obj.time_interval()
-
     gps_obj.del_conn()
 
 
