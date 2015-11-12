@@ -14,7 +14,8 @@ import datetime
 class gps_dump():
 
     def __init__(self):
-        self.dir = r'E:/Data/Geolife/geolife/Data/*'
+        #self.dir = r'E:/Data/Geolife/geolife/Data/*'
+        self.dir = r'D:/1_trajectory_data/geolife/Data/*'
 
         self.host = 'localhost'
         self.database ='geolife'
@@ -99,7 +100,8 @@ class gps_dump():
         files_list = glob.glob(self.dir)
         for f in files_list:
             file_uid = re.search(self.match_pattern,f).group(0)
-            dir_plt = r'E:/Data/Geolife/geolife/Data/'+file_uid+r'/Trajectory/*'
+            #dir_plt = r'E:/Data/Geolife/geolife/Data/'+file_uid+r'/Trajectory/*'
+            dir_plt = r'D:/1_trajectory_data/geolife/Data/'+file_uid+r'/Trajectory/*'
             plt_list = glob.glob(dir_plt)
             for f_plt in plt_list:
                 if '200811' in f_plt:
@@ -238,11 +240,11 @@ if __name__ == "__main__":
     gps_obj.conn()
     gps_obj.create_table()
     gps_obj.read_file()
-    gps_obj.day_week()
-    gps_obj.hour_day()
-    gps_obj.time_interval()
-    gps_obj.calc_distance()
-    gps_obj.calc_speed()
+    #gps_obj.day_week()
+    #gps_obj.hour_day()
+    #gps_obj.time_interval()
+    #gps_obj.calc_distance()
+    #gps_obj.calc_speed()
     gps_obj.del_conn()
 
 
