@@ -15,6 +15,7 @@ class gps_dump():
 
     def __init__(self):
         self.dir = r'E:/Data/Geolife/geolife/Data/*'
+
         self.host = 'localhost'
         self.database ='geolife'
         self.user = 'postgres'
@@ -26,8 +27,9 @@ class gps_dump():
         self.match_pattern = re.compile(r'[0-9]{3}')
         self.count = 0
         self.dict_p = {}
-        self.list_uid = []
-        self.lst_row =[]
+        self.list_uid=[]
+        #self.lst_row =[]
+        self.num_users=0
 
     def conn(self):
         self.conn = None
@@ -84,7 +86,7 @@ class gps_dump():
                 self.cur.execute('ALTER TABLE geolife.gps_points ADD hour_day time without time zone')
                 self.conn.commit()
             if ('speed',) not in rows:
-                self.cur.execute('ALTER TABLE geolife.gps_points ADD speed INTEGER')
+                self.cur.execute('ALTER TABLE geolife.gps_points ADD speed REAL')
             if ('time_diff',) not in rows:
                 self.cur.execute('ALTER TABLE geolife.gps_points ADD time_diff INTERVAL')
             if ('distance',) not in rows:
@@ -97,33 +99,50 @@ class gps_dump():
         files_list = glob.glob(self.dir)
         for f in files_list:
             file_uid = re.search(self.match_pattern,f).group(0)
-            dir_plt = r'E:/Data/Geolife/geolife/Data/'+file_uid+r'/Trajectory/200811*'
+            dir_plt = r'E:/Data/Geolife/geolife/Data/'+file_uid+r'/Trajectory/*'
             plt_list = glob.glob(dir_plt)
             for f_plt in plt_list:
-                print ("---->the current processed file is: "+f_plt)
-                with open(f_plt,'r') as f:
-                    points_str = f.read()
-                    match = re.search(self.points_pattern,points_str)
-                    points = match.group(1)
-                    matches = re.findall(self.point_pattern,points)
-                    for ma in matches:
-                        self.dict_p['uid'] = int(file_uid)
-                        self.dict_p['lati'] = float(ma[0])
-                        self.dict_p['longti'] = float(ma[1])
-                        self.dict_p['alti'] = float(ma[2])
-                        self.dict_p['days_passed'] = float(ma[3])
-                        self.dict_p['time_p'] =ma[4]+' '+ ma[5]
-                        if self.list_ps.__len__()==0:
-                            self.list_ps.append(copy.deepcopy(self.dict_p))
-                        else:
-                            n = self.list_ps.__len__()
-                            if self.dict_p['uid']==self.list_ps[n-1]['uid'] and self.dict_p['time_p']==self.list_ps[n-1]['time_p']:
-                                continue
-                            else:
+                if '200811' in f_plt:
+                    continue
+                else:
+                    print ("---->the current processed file is: "+f_plt)
+                    with open(f_plt,'r') as f:
+                        points_str = f.read()
+                        match = re.search(self.points_pattern,points_str)
+                        points = match.group(1)
+                        matches = re.findall(self.point_pattern,points)
+                        for ma in matches:
+                            self.dict_p['uid'] = int(file_uid)
+                            self.dict_p['lati'] = float(ma[0])
+                            self.dict_p['longti'] = float(ma[1])
+                            self.dict_p['alti'] = float(ma[2])
+                            self.dict_p['days_passed'] = float(ma[3])
+                            self.dict_p['time_p'] =ma[4]+' '+ ma[5]
+                            if self.list_ps.__len__()==0:
                                 self.list_ps.append(copy.deepcopy(self.dict_p))
+                            else:
+                                n = self.list_ps.__len__()
+                                if self.dict_p['uid']==self.list_ps[n-1]['uid'] and self.dict_p['time_p']==self.list_ps[n-1]['time_p']:
+                                    continue
+                                else:
+                                    self.list_ps.append(copy.deepcopy(self.dict_p))
 
-                    self.insert2table()
-                    del self.list_ps[:]
+                        self.insert2table()
+                        del self.list_ps[:]
+
+    def num_uid(self):
+        try:
+            self.cur.execute('SELECT DISTINCT uid FROM geolife.gps_points')
+            rows = self.cur.fetchall()
+            self.num_users =rows.__len__()
+            rows_2 =[]
+            for i in range(0,self.num_users,1):
+                rows_2.append(rows[i][0])
+            self.list_uid = rows_2
+
+        except Exception as err:
+            print "----->something wrong happened during querying the number of users"
+            print err.message
 
 
     def day_week(self):
@@ -173,27 +192,14 @@ class gps_dump():
             self.conn.close()
             print "-------->the database is closed now"
 
-    def num_uid(self):
-        try:
-            self.cur.execute('SELECT DISTINCT uid FROM geolife.gps_points')
-            rows = self.cur.fetchall()
-            self.num_users =rows.__len__()
-            rows_2 =[]
-            for i in range(0,self.num_users,1):
-                rows_2.append(rows[i][0])
-            self.list_uid = rows_2
-
-        except Exception as err:
-            print "----->something wrong happened during querying the number of users"
-            print err.message
-
     def time_interval(self):
         if self.list_uid.__len__() == 0:
             self.num_uid()
         try:
             for j in self.list_uid:
-                self.cur.execute('select time_p, time_p-lag(time_p) over (partition by day_week order by time_p ASC) as time_diff'
-                                 ' from geolife.gps_points where uid={0}'.format(j))
+                self.cur.execute('update geolife.gps_points set time_diff=m.b '
+                                 'from(select seri, b.time_p-lag(b.time_p) over (partition by b.day_week order by b.time_p ASC) as b '
+                                 'from geolife.gps_points as b where uid=j) as m where geolife.gps_points.seri=m.seri'.format(j))
                 self.conn.commit()
                 print "time difference of the user {0} has been processed successfully".format(j)
             print "all time difference has been processed"
@@ -202,17 +208,28 @@ class gps_dump():
             print err.message
 
     def calc_distance(self):
-        if self.uid.__length__ == 0:
+        if self.list_uid.__length__ == 0:
             self.num_uid()
         try:
             for j in self.list_uid:
-                self.cur.execute('select time_p, time_p-lag(time_p) over (partition by day_week order by time_p ASC) as time_diff'
-                         ' from geolife.gps_points where uid={0}'.format(j))
+                self.cur.execute('Update geolife.gps_points set distance=m.b '
+                                 'from (select seri,st_distance_sphere (geog_p,lag(geog_p) over (partition by day_week order by time_p ASC)) as b '
+                                 'from geolife.gps_points where uid=j) as m where geolife.gps_points.seri=m.seri'.format(j))
                 self.conn.commit()
-                print "time difference of the user {0} has been processed successfully".format(j)
-            print "all time difference has been processed"
+                print "distance of the user {0} has been processed successfully".format(j)
+            print "all distance has been processed"
         except Exception as err:
-            print '----->error happened during time difference calculation'
+            print '----->error happened during distance calculation'
+            print err.message
+    def calc_speed(self):
+        try:
+            self.cur.execute('update geolife.gps_points as a set speed=(distance/extract(epoch from time_diff))')
+            self.conn.commit()
+            self.cur.execute("update geolife.gps_points as a set speed=Null where time_diff>’00:00:05’")
+            self.conn.commit()
+            print"all speed has been processed"
+        except Exception as err:
+            print '----->error happened during speed calculation'
             print err.message
 
 
@@ -224,6 +241,8 @@ if __name__ == "__main__":
     gps_obj.day_week()
     gps_obj.hour_day()
     gps_obj.time_interval()
+    gps_obj.calc_distance()
+    gps_obj.calc_speed()
     gps_obj.del_conn()
 
 
